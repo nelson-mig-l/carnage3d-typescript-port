@@ -1,0 +1,10 @@
+Debug/
+Release/
+.vs/
+.idea/
+.build/
+build/
+third_party/
+gamedata/config/*.json
+gamedata/demoversions/
+bin/
