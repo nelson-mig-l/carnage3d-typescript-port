@@ -4,8 +4,8 @@ This repository already contains the project documentation. Use the files below 
 
 ## Source of truth
 
-- Phase 1 architecture and delivery plan: [PHASE_1.md](./PHASE_1.md)
-- Broader TypeScript port strategy and roadmap: [TYPESCRIPT_PORT_PLAN.md](./TYPESCRIPT_PORT_PLAN.md)
+- Phase 1 architecture and delivery plan: [PHASE_1.md](./docs/PHASE_1.md)
+- Broader TypeScript port strategy and roadmap: [TYPESCRIPT_PORT_PLAN.md](./docs/TYPESCRIPT_PORT_PLAN.md)
 - Original C++ project: [carnage3d/carnage3d](https://github.com/carnage3d/carnage3d)
 
 ## Working rule
