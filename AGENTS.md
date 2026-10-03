@@ -55,7 +55,6 @@ Before making architectural changes, consult the existing project documentation.
 
 In particular:
 
-- `AGENT_INSTRUCTIONS.md`
 - `docs/PHASE_1.md`
 - `docs/TYPESCRIPT_PORT_PLAN.md`
 
@@ -85,7 +84,7 @@ Current Phase 1 choices include:
 - Babylon Sound for audio
 - Custom image loading
 
-Refer to `AGENT_INSTRUCTIONS.md` and the phase documentation for the authoritative project direction.
+Refer to the phase documentation for the authoritative project direction.
 
 ## Dependency changes
 
