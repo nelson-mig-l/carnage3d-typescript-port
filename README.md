@@ -156,3 +156,9 @@ Then continue implementing the next phase of the port.
 The immediate objective is to finish stabilizing the Phase 1 runtime foundation and then proceed with the gameplay systems required for the Carnage3D port.
 
 Future phases will progressively replace placeholders with the original game's gameplay, assets, physics, input behavior, UI, and other systems.
+
+## AI Usage
+
+This project makes use of AI-assisted development tools. AI has been used to help with code generation, refactoring, debugging, documentation, and development workflows.
+
+All AI-generated contributions are reviewed, tested, and integrated as part of the project's development process. The project remains maintained and directed by its human author.
