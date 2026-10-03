@@ -21,7 +21,6 @@ export class GameEngine {
       enter: () => undefined,
       update: () => undefined,
       leave: () => undefined,
-      render: () => this.renderEngine.render(),
     });
 
     this.gameLoop = new GameLoop((delta) => this.tick(delta), this.config);
@@ -54,5 +53,6 @@ export class GameEngine {
     this.renderEngine.beginFrame();
     this.stateMachine.update(delta);
     this.stateMachine.render();
+    this.renderEngine.render();
   }
 }

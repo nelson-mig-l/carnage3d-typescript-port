@@ -10,7 +10,6 @@ vi.mock('babylonjs', () => {
       this.scene = new MockScene();
     }
 
-    runRenderLoop = vi.fn();
     resize = vi.fn();
     dispose = vi.fn();
   }
@@ -77,5 +76,33 @@ describe('RenderEngine', () => {
     expect(engine.getDeltaTime()).toBe(0);
 
     engine.dispose();
+  });
+
+  it('renders only when explicitly requested', () => {
+    const renderer = new RenderEngine(document.createElement('canvas'));
+    const scene = renderer.getScene();
+    const render = vi.spyOn(scene!, 'render');
+
+    renderer.render();
+
+    expect(render).toHaveBeenCalledTimes(1);
+
+    renderer.dispose();
+  });
+
+  it('removes the resize listener when disposed', () => {
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    const removeEventListener = vi.spyOn(window, 'removeEventListener');
+    const engine = new RenderEngine(document.createElement('canvas'));
+    const resizeHandler = addEventListener.mock.calls.find(([type]) => type === 'resize')?.[1];
+
+    expect(resizeHandler).toBeDefined();
+
+    engine.dispose();
+
+    expect(removeEventListener).toHaveBeenCalledWith('resize', resizeHandler);
+
+    addEventListener.mockRestore();
+    removeEventListener.mockRestore();
   });
 });

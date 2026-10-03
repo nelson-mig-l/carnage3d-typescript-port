@@ -10,7 +10,6 @@ vi.mock('babylonjs', () => {
       this.scene = new MockScene();
     }
 
-    runRenderLoop = vi.fn();
     resize = vi.fn();
     dispose = vi.fn();
     getDeltaTime = vi.fn(() => 16.67);
@@ -73,6 +72,30 @@ describe('Phase 1 smoke tests', () => {
     const canvas = document.createElement('canvas');
 
     expect(() => new GameEngine(canvas)).not.toThrow();
+  });
+
+  it('renders the scene once per game-loop tick', async () => {
+    const callbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+    const engine = new GameEngine(document.createElement('canvas'));
+    const scene = engine.getRenderEngine().getScene();
+    const render = vi.spyOn(scene!, 'render');
+
+    await engine.start();
+
+    expect(render).not.toHaveBeenCalled();
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+    callbacks.shift()?.(16.67);
+
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
+
+    engine.stop();
+    requestAnimationFrame.mockRestore();
   });
 
   it('creates a RenderEngine with a canvas and valid Babylon scene', () => {

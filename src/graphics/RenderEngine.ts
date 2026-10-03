@@ -9,6 +9,7 @@ export class RenderEngine {
   private readonly camera: BABYLON.Camera | null;
   private readonly cameraRig: CameraRig | null;
   private readonly sceneManager: SceneManager | null;
+  private resizeHandler: (() => void) | null = null;
 
   private deltaTime = 0;
   private elapsedTime = 0;
@@ -37,10 +38,10 @@ export class RenderEngine {
     this.sceneManager = new SceneManager(this.scene);
 
     this.scene.clearColor = new BABYLON.Color4(0.06, 0.08, 0.12, 1);
-    this.engine.runRenderLoop(() => this.scene?.render());
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('resize', () => this.engine?.resize());
+      this.resizeHandler = () => this.engine?.resize();
+      window.addEventListener('resize', this.resizeHandler);
     }
   }
 
@@ -115,6 +116,11 @@ export class RenderEngine {
   }
 
   dispose(): void {
+    if (this.resizeHandler && typeof window !== 'undefined') {
+      window.removeEventListener('resize', this.resizeHandler);
+      this.resizeHandler = null;
+    }
+
     this.engine?.dispose();
     this.scene?.dispose();
   }
