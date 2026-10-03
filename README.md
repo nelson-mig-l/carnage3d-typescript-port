@@ -65,6 +65,12 @@ The deployment process should:
 3. Create the production bundle with `npm run bundle`.
 4. Publish the generated `dist/` directory to GitHub Pages.
 
+### Deployment / Asset paths
+
+Vite uses a relative base path so the generated site works both under the GitHub Pages repository URL and when served from the custom domain. Runtime asset paths should likewise remain relative (for example, `./assets`) rather than root-relative paths such as `/assets`.
+
+If the deployment model changes, revisit these paths together; changing only one can cause assets to work in one hosting environment but fail in the other.
+
 ## Phase 1
 
 Phase 1 establishes the basic runtime structure required before porting gameplay systems.
