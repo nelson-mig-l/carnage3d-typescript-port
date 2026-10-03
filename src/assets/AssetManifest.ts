@@ -17,7 +17,7 @@ export interface AssetManifest {
 export function createDefaultAssetManifest(): AssetManifest {
   return {
     version: '1.0.0',
-    basePath: '/assets',
+    basePath: './assets',
     assets: [
       {
         id: 'ui.cursor',
