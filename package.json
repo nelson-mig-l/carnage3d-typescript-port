@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit",
+    "bundle": "vite build",
+    "build:production": "npm run build && npm run bundle",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "lint": "eslint . --ext .ts",

@@ -13,4 +13,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
   },
+  "build": {
+    target: "es2022",
+  },
 });
