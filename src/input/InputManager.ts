@@ -19,14 +19,14 @@ export class InputManager {
   private readonly actionState = new Map<InputAction, boolean>();
 
   private readonly keyMap: InputKeyMap = {
-    moveUp: ['arrowup', 'w', 'w', 'space'],
+    moveUp: ['arrowup', 'w'],
     moveDown: ['arrowdown', 's'],
     moveLeft: ['arrowleft', 'a'],
     moveRight: ['arrowright', 'd'],
     action: [' ', 'space', 'spacebar'],
     shoot: ['control', 'ctrl'],
     hudToggle: ['tab'],
-    interact: ['enter'],
+    interact: ['enter', 'f'],
   };
 
   bindKeyboard(): void {
