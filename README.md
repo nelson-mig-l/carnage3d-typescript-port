@@ -1,6 +1,6 @@
 # Carnage3D TypeScript Port a.k.a JTA Javascript Theft Auto
 
-![Carnage3D favicon](docs/banner.png)
+![Carnage3D favicon](docs/images/banner.png)
 
 A TypeScript port of the Carnage3D game engine, built around Babylon.js and modern browser APIs.
 
