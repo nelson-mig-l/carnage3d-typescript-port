@@ -1,6 +1,6 @@
 # Carnage3D TypeScript Port — Issue List
 
-Repository reviewed: `nelson-mig-l/carnage3d-typescript-port`  
+Repository reviewed: `nelson-mig-l/javascript-theft-auto`  
 Branch: `main`
 
 ## High Priority

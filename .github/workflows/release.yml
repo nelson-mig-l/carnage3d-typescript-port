@@ -34,11 +34,11 @@ jobs:
       - name: Package release
         run: |
           cd dist
-          zip -r ../carnage3d-${GITHUB_REF_NAME}.zip .
+          zip -r ../jta-${GITHUB_REF_NAME}.zip .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            carnage3d-${{ github.ref_name }}.zip
+            jta-${{ github.ref_name }}.zip

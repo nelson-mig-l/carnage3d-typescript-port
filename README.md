@@ -1,6 +1,6 @@
-# Carnage3D TypeScript Port a.k.a JTA Javascript Theft Auto
+# JTA - Javascript Theft Auto
 
-![Carnage3D favicon](docs/images/banner.png)
+![Javascript Theft Auto banner](docs/images/banner.png)
 
 A TypeScript port of the Carnage3D game engine, built around Babylon.js and modern browser APIs.
 
@@ -56,7 +56,7 @@ The project is configured to be deployable as a Vite static site on GitHub Pages
 
 The expected production URL is:
 
-**https://nelson-mig-l.github.io/carnage3d-typescript-port/**
+**https://nelson-mig-l.github.io/javascript-theft-auto/**
 
 The repository should use **GitHub Actions** as its Pages publishing source.
 
