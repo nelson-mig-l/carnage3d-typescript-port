@@ -1,0 +1,138 @@
+name: Update Carnage Subtree
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-carnage
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse to run with an outstanding diff report
+        run: |
+          if [ -e carnage-diff.txt ]; then
+            echo "::error::carnage-diff.txt already exists. Review/remove it before running the update again."
+            exit 1
+          fi
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream Carnage
+        run: |
+          git remote add carnage-upstream https://github.com/codenamecpp/carnage3d.git
+          git fetch --no-tags carnage-upstream main
+
+      - name: Find the last upstream commit represented by the subtree
+        id: base
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          merge_commit="$(git log --merges --format='%H' -n 1 -- carnage)"
+
+          if [ -z "$merge_commit" ]; then
+            echo "::error::Could not find a previous subtree merge for carnage/."
+            exit 1
+          fi
+
+          mapfile -t parents < <(git rev-list --parents -n 1 "$merge_commit")
+          base="${parents[2]:-}"
+
+          if [ -z "$base" ]; then
+            echo "::error::The latest carnage subtree merge does not have an upstream parent."
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$base" carnage-upstream/main; then
+            echo "::error::The upstream subtree base is not an ancestor of carnage-upstream/main."
+            exit 1
+          fi
+
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "Subtree base: $base"
+
+      - name: Collect new upstream commits
+        id: changes
+        shell: bash
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t commits < <(
+            git rev-list --reverse "$BASE..carnage-upstream/main"
+          )
+
+          if [ "${#commits[@]}" -eq 0 ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No upstream commits to apply."
+            exit 0
+          fi
+
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${commits[@]}" > /tmp/carnage-new-commits.txt
+
+          {
+            echo "# Carnage subtree update"
+            echo
+            echo "Upstream: https://github.com/codenamecpp/carnage3d.git"
+            echo "Base commit: $BASE"
+            echo "Target commit: $(git rev-parse carnage-upstream/main)"
+            echo
+
+            while IFS= read -r commit; do
+              echo "## $commit"
+              echo
+              echo "Commit message:"
+              git log -1 --format='%B' "$commit" | sed 's/^/> /'
+              echo
+              echo "Modified files:"
+
+              mapfile -t paths < <(
+                git diff-tree --no-commit-id --name-only -r -m "$commit" |
+                  sort -u
+              )
+
+              if [ "${#paths[@]}" -eq 0 ]; then
+                echo "- (no file paths reported)"
+              else
+                for path in "${paths[@]}"; do
+                  echo "- carnage/$path"
+                done
+              fi
+
+              echo
+            done < /tmp/carnage-new-commits.txt
+          } > /tmp/carnage-diff.txt
+
+      - name: Update Carnage subtree
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git subtree pull             --prefix=carnage             https://github.com/codenamecpp/carnage3d.git             main             --squash
+
+      - name: Create Carnage diff report
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          cp /tmp/carnage-diff.txt carnage-diff.txt
+          git add carnage-diff.txt
+          git commit -m "Document Carnage subtree changes"
+
+      - name: Push updates
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git push origin HEAD:main
