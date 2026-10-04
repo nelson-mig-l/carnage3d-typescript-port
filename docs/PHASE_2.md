@@ -1,11 +1,4 @@
-Sure. Here’s a Python script that creates `docs/PHASE_2.md` in your local clone. It uses only the Python standard library, so there are no dependencies.
-
-Save this as `create_phase2.py` in the repository root:
-
-````python
-from pathlib import Path
-
-CONTENT = r"""# Phase 2: Graphics Layer
+# Phase 2: Graphics Layer
 
 ## Goal
 
@@ -385,48 +378,3 @@ Phase 3 will build on this rendering foundation by introducing:
 * keyboard/mouse/gamepad input
 * the input manager
 * physics/render synchronization
-  """
-
-def main() -> None:
-repo_root = Path(**file**).resolve().parent
-output = repo_root / "docs" / "PHASE_2.md"
-
-```
-output.parent.mkdir(parents=True, exist_ok=True)
-output.write_text(CONTENT, encoding="utf-8")
-
-print(f"Created: {output}")
-```
-
-if **name** == "**main**":
-main()
-
-````
-
-Then run:
-
-```bash
-python create_phase2.py
-````
-
-Verify it:
-
-```bash
-git diff -- docs/PHASE_2.md
-```
-
-Then commit and push:
-
-```bash
-git add docs/PHASE_2.md
-git commit -m "Add Phase 2 graphics layer plan"
-git push origin main
-```
-
-If you want to do **everything in one command after creating the script**:
-
-```bash
-python create_phase2.py && git add docs/PHASE_2.md && git commit -m "Add Phase 2 graphics layer plan" && git push origin main
-```
-
-This approach bypasses the broken GitHub connector entirely.
