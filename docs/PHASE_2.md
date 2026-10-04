@@ -2,9 +2,9 @@
 
 ## Goal
 
-Build the browser-based 3D rendering foundation for the TypeScript port using Babylon.js, while keeping the rendering layer isolated from game logic and asset-loading concerns.
+Build the browser-based rendering foundation for the TypeScript port using Babylon.js, while keeping the rendering layer isolated from gameplay and state logic.
 
-Phase 2 should establish the renderer, basic scene/camera setup, texture and mesh primitives, sprite rendering, shader support, and the first version of the runtime asset pipeline.
+Phase 2 should establish the renderer, basic scene and camera setup, minimal texture and mesh primitives, sprite support, and the first runtime asset-loading foundation. This is a targeted graphics milestone rather than a full conversion of all rendering subsystems.
 
 ---
 
@@ -50,6 +50,7 @@ class RenderEngine {
 * A camera is configured and can render the scene.
 * The renderer can render a minimal test scene in the browser.
 * Rendering responsibilities are not mixed into game-state or entity classes.
+* The implementation remains scoped to the runtime shell and graphics layer, without attempting a full game-world conversion in the same step.
 
 ---
 
@@ -59,31 +60,19 @@ Port the existing rendering concepts into Babylon.js abstractions.
 
 ### Texture Rendering
 
-Replace:
-
-```
-GpuTexture2D
-```
-
-with Babylon.js:
+Add the Babylon.js texture layer needed for the app shell and future sprite work:
 
 * `Texture`
 * `DynamicTexture`
 
-Support the texture operations required by the existing game renderer.
+The initial goal is to support the minimal rendering operations required by the port, rather than a full one-to-one replacement of every legacy GPU abstraction.
 
 ### Mesh Rendering
 
-Replace:
+Use Babylon.js meshes for the basic scene setup:
 
-```
-TrimeshBuffer
-```
-
-with Babylon.js meshes using:
-
-* vertex buffers
-* index buffers
+* ground or placeholder meshes
+* simple primitive geometry
 * materials
 * transforms
 
@@ -91,15 +80,7 @@ The first implementation should favour correctness and a clear abstraction over 
 
 ### Sprite Rendering
 
-Replace:
-
-```
-Sprite2D
-```
-
-with billboard or plane-based sprites.
-
-The renderer should support:
+Support sprites through billboards or plane-based sprites where needed:
 
 * sprite textures
 * sprite positioning
@@ -108,9 +89,11 @@ The renderer should support:
 * texture regions / atlas coordinates
 * camera-facing billboards where appropriate
 
+This should be treated as an incremental renderer capability, not a full port of the entire legacy sprite pipeline in the same step.
+
 ### Shader Rendering
 
-Replace GLSL shader usage with Babylon.js `ShaderMaterial`.
+Use Babylon.js `ShaderMaterial` where custom effects are required.
 
 The abstraction should make it possible to add custom shaders without leaking shader-specific details into unrelated game code.
 
@@ -145,10 +128,10 @@ Responsibilities:
 * Load textures
 * Load sprite sheets
 * Load model/mesh data
-* Parse original GTA1 `.sty` data where required
-* Convert block data into Babylon meshes
 * Cache loaded resources
 * Avoid loading the same resource multiple times
+
+For Phase 2, original GTA1 binary parsing should be treated as future work unless it is explicitly required by the current milestone. The loader should support a manifest-based runtime path model and placeholder asset integration without blocking the renderer.
 
 Runtime assets should live under:
 
@@ -166,7 +149,7 @@ Keep the source asset organization predictable and avoid coupling game code to i
 
 ### Asset Path Requirements
 
-Runtime paths should remain relative so the application works both on the GitHub Pages project URL and on a custom domain.
+Runtime paths should remain relative to the deployed app so the project works cleanly across a GitHub Pages URL or a custom domain.
 
 Example:
 
@@ -174,30 +157,29 @@ Example:
 const texturePath = './assets/textures/vehicles/car.png';
 ```
 
-Do not use root-relative runtime paths such as:
+Avoid root-relative runtime paths such as:
 
 ```typescript
 '/assets/textures/vehicles/car.png'
 ```
 
+This is a deployment concern and should not be treated as the main implementation focus of the graphics milestone.
+
 ---
 
 ## 2.4 Camera and GTA1 View
 
-The original game uses an isometric-style view.
+The original game uses an isometric-style presentation, and the Babylon.js implementation should keep that behavior in mind while building the render shell.
 
-The Babylon.js implementation should use an orthographic camera with a projection suitable for the game's presentation.
+The initial camera direction should support:
 
-Requirements:
-
-* orthographic projection
 * stable camera orientation
 * configurable zoom
 * configurable camera position
 * support for the game's world coordinate system
-* camera behaviour isolated from gameplay entities
+* camera behavior isolated from gameplay entities
 
-Do not hard-code camera behaviour into individual game objects.
+The project should prefer a clear, data-driven camera abstraction over hard-coded object behavior. Orthographic projection is a valid target design choice for the GTA1 presentation, but it should be treated as the intended render direction rather than a mandatory completion gate for every intermediate step.
 
 ---
 
@@ -232,13 +214,13 @@ renderEngine.setCamera(...);
 renderEngine.render();
 ```
 
-This keeps the future option of changing rendering implementation without rewriting gameplay systems.
+This keeps the future option of changing rendering implementation without rewriting gameplay systems, while staying within the actual scope of the current milestone.
 
 ---
 
 ## 2.6 Integration With the Game Loop
 
-Phase 2 should establish the rendering side of the main engine loop.
+Phase 2 should establish the rendering side of the main engine loop without overcommitting to full gameplay behavior.
 
 Target flow:
 
@@ -257,6 +239,8 @@ Babylon.js Scene
   ↓
 Canvas
 ```
+
+The immediate goal is a clean rendering integration path, while gameplay systems remain intentionally separate and are expected to evolve in later phases.
 
 The renderer should expose enough functionality for the application to:
 
