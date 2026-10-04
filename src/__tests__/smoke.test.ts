@@ -98,6 +98,31 @@ describe('Phase 1 smoke tests', () => {
     requestAnimationFrame.mockRestore();
   });
 
+  it('binds and updates the input manager during engine startup', async () => {
+    const callbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    });
+
+    const engine = new GameEngine(document.createElement('canvas'));
+    const inputManager = engine.getInputManager();
+    const bindKeyboard = vi.spyOn(inputManager, 'bindKeyboard');
+    const update = vi.spyOn(inputManager, 'update');
+
+    await engine.start();
+
+    expect(bindKeyboard).toHaveBeenCalledTimes(1);
+    expect(update).not.toHaveBeenCalled();
+
+    callbacks.shift()?.(16.67);
+
+    expect(update).toHaveBeenCalledTimes(1);
+
+    engine.stop();
+    requestAnimationFrame.mockRestore();
+  });
+
   it('creates a RenderEngine with a canvas and valid Babylon scene', () => {
     const canvas = document.createElement('canvas');
     const renderEngine = new RenderEngine(canvas);
@@ -130,6 +155,15 @@ describe('Phase 1 smoke tests', () => {
     expect(machine.currentState).toBe('mainMenu');
     expect(() => machine.update(0.016)).not.toThrow();
     expect(() => machine.render()).not.toThrow();
+  });
+
+  it('enters the runtime main menu state during engine startup', async () => {
+    const engine = new GameEngine(document.createElement('canvas'));
+
+    await engine.start();
+
+    expect(engine.getCurrentState()).toBe('mainMenu');
+    engine.stop();
   });
 
   it('initializes an asset manifest via the loader', async () => {

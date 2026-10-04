@@ -51,11 +51,12 @@ export class AssetLoader {
 
   async loadAsset(asset: AssetDescriptor): Promise<LoadedAsset> {
     const url = this.resolveAssetUrl(asset);
+    const ready = await this.isAssetReachable(url);
     const loadedAsset: LoadedAsset = {
       id: asset.id,
       type: asset.type,
       src: asset.src,
-      ready: true,
+      ready,
       url,
       metadata: asset.metadata,
     };
@@ -66,6 +67,28 @@ export class AssetLoader {
 
   private resolveAssetUrl(asset: AssetDescriptor): string {
     const relativeSource = asset.path ?? asset.src;
-    return `${this.manifest.basePath.replace(/\/$/, '')}/${relativeSource.replace(/^\//, '')}`;
+    const normalizedBase = this.manifest.basePath.replace(/\/$/, '');
+    return `${normalizedBase}/${relativeSource.replace(/^\//, '')}`;
+  }
+
+  private async isAssetReachable(url: string): Promise<boolean> {
+    if (typeof fetch !== 'function') {
+      return true;
+    }
+
+    if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+      return true;
+    }
+
+    if (typeof document === 'undefined' || !document.body) {
+      return true;
+    }
+
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
+    } catch {
+      return true;
+    }
   }
 }
