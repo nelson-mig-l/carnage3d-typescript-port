@@ -29,6 +29,12 @@ Use `carnage/` for:
 
 When porting code from `carnage/`, translate the relevant behavior into the TypeScript architecture rather than modifying the C++ source.
 
+### `opengta/`
+
+**Do not modify, refactor, rename, delete, or reformat files under `opengta/` unless the user explicitly asks for changes to the original C++ project.**
+
+Do not use the contents of `opengta/` unless directly instructed to do so for a specif task. After the task is complete the contents of the directory should no longer be used for any purpose.
+
 ### `node_modules/`
 
 Never modify or commit files under `node_modules/`.
