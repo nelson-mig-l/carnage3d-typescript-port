@@ -1,3 +1,4 @@
+import { Howl } from 'howler';
 import { AssetDescriptor, AssetManifest, AssetType, createDefaultAssetManifest } from './AssetManifest';
 
 export type LoadedAsset = {
@@ -7,6 +8,8 @@ export type LoadedAsset = {
   ready: boolean;
   url: string;
   metadata?: Record<string, unknown>;
+  resource?: HTMLImageElement | FontFace | Howl;
+  error?: string;
 };
 
 export type LoadedAssetBuckets = {
@@ -51,18 +54,61 @@ export class AssetLoader {
 
   async loadAsset(asset: AssetDescriptor): Promise<LoadedAsset> {
     const url = this.resolveAssetUrl(asset);
-    const ready = await this.isAssetReachable(url);
-    const loadedAsset: LoadedAsset = {
-      id: asset.id,
-      type: asset.type,
-      src: asset.src,
-      ready,
-      url,
-      metadata: asset.metadata,
-    };
 
-    this.loadedAssets.set(asset.id, loadedAsset);
-    return loadedAsset;
+    try {
+      const resource = await this.loadResource(asset, url);
+      const loaded: LoadedAsset = { id: asset.id, type: asset.type, src: asset.src, ready: true, url, metadata: asset.metadata, resource };
+      this.loadedAssets.set(asset.id, loaded);
+      return loaded;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const loaded: LoadedAsset = { id: asset.id, type: asset.type, src: asset.src, ready: false, url, metadata: asset.metadata, error: message };
+      this.loadedAssets.set(asset.id, loaded);
+      return loaded;
+    }
+  }
+
+  private async loadResource(asset: AssetDescriptor, url: string): Promise<HTMLImageElement | FontFace | Howl> {
+    switch (asset.type) {
+      case 'texture':
+      case 'sprite':
+        return this.loadImage(url);
+      case 'font':
+        return this.loadFont(asset, url);
+      case 'sound':
+        return this.loadSound(asset, url);
+    }
+  }
+
+  private loadImage(url: string): Promise<HTMLImageElement> {
+    if (typeof Image === 'undefined') return Promise.reject(new Error(`Cannot load image outside a browser: ${url}`));
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+      image.src = url;
+    });
+  }
+
+  private async loadFont(asset: AssetDescriptor, url: string): Promise<FontFace> {
+    if (typeof FontFace === 'undefined' || typeof document === 'undefined') throw new Error(`Cannot load font outside a browser: ${url}`);
+    const family = typeof asset.metadata?.family === 'string' ? asset.metadata.family : asset.id;
+    const font = new FontFace(family, `url("${url}")`);
+    await font.load();
+    document.fonts.add(font);
+    return font;
+  }
+
+  private loadSound(asset: AssetDescriptor, url: string): Promise<Howl> {
+    return new Promise((resolve, reject) => {
+      let sound: Howl;
+      sound = new Howl({
+        src: [url],
+        loop: asset.metadata?.loop === true,
+        onload: () => resolve(sound),
+        onloaderror: (_id, error) => reject(new Error(`Failed to load sound ${asset.id}: ${String(error)}`)),
+      });
+    });
   }
 
   private resolveAssetUrl(asset: AssetDescriptor): string {
