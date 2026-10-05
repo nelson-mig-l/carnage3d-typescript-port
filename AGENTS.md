@@ -13,6 +13,11 @@ The active implementation lives primarily in:
 
 The `carnage/` directory contains the original C++ Carnage3D project and should be treated as a **reference implementation**, not as part of the TypeScript codebase.
 
+Other sources might be:
+* https://github.com/mikedailly/GTAWorld
+* https://github.com/niklasvh/WebGL-GTA
+but use this only if explicitly requested to
+
 ## Do not modify
 
 ### `carnage/`
