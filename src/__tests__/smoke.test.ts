@@ -55,6 +55,7 @@ vi.mock('babylonjs', () => {
     MeshBuilder: {
       CreateGround: vi.fn(() => new MockGround()),
       CreateSphere: vi.fn(() => ({ position: { y: 0 } })),
+      CreateBox: vi.fn(() => ({ position: { x: 0, y: 0, z: 0 }, material: undefined, dispose: vi.fn() })),
     },
   };
 
