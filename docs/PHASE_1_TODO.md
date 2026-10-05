@@ -10,8 +10,8 @@
 ## 3. Real state boot flow [DONE]
 * `StateMachine.ts` is working in tests and the engine now registers and enters runtime states such as `MainMenuState.ts` and `GameplayState.ts` during startup.
 * The game boots into the live main menu state instead of remaining in the placeholder boot state.
-## 4. App bootstrap smoke test in the browser
+## 4. App bootstrap smoke test in the browser [DONE]
 * The game should start cleanly, enter a state, and remain stable without console errors.
 * This is the “App boots / Scene renders / State machine works” definition-of-done check.
-## 5. Asset loader runtime wiring
+## 5. Asset loader runtime wiring [DONE]
 `AssetLoader.ts` is in place, but the runtime should load from a real asset path model and not just a placeholder manifest.
