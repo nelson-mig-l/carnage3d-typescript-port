@@ -86,6 +86,10 @@ export class RenderEngine {
     return this.camera;
   }
 
+  showLoadedAssets(assets: import('../assets/AssetLoader').LoadedAssetBuckets): void {
+    this.sceneManager?.showLoadedAssets(assets);
+  }
+
   beginFrame(): void {
     const now = performance.now();
 
