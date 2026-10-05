@@ -20,6 +20,7 @@ vi.mock('babylonjs', () => {
     render = vi.fn();
     dispose = vi.fn();
     getEngine = vi.fn(() => ({ getRenderingCanvas: vi.fn(() => document.createElement('canvas')) }));
+    getMeshByName = vi.fn(() => undefined);
   }
 
   class MockCamera {
