@@ -117,24 +117,4 @@ export class AssetLoader {
     return `${normalizedBase}/${relativeSource.replace(/^\//, '')}`;
   }
 
-  private async isAssetReachable(url: string): Promise<boolean> {
-    if (typeof fetch !== 'function') {
-      return true;
-    }
-
-    if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
-      return true;
-    }
-
-    if (typeof document === 'undefined' || !document.body) {
-      return true;
-    }
-
-    try {
-      const response = await fetch(url, { method: 'HEAD' });
-      return response.ok;
-    } catch {
-      return true;
-    }
-  }
 }
