@@ -16,7 +16,8 @@ The `carnage/` directory contains the original C++ Carnage3D project and should 
 Other sources might be:
 * https://github.com/mikedailly/GTAWorld
 * https://github.com/niklasvh/WebGL-GTA
-but use this only if explicitly requested to
+
+but use these only if explicitly requested to
 
 ## Do not modify
 
