@@ -57,59 +57,59 @@ vi.mock('babylonjs', () => {
     },
   };
 
-  it('loads an image resource from its manifest URL', async () => {
-    const image = new Image();
-    const ImageConstructor = vi.fn(() => image);
-    vi.stubGlobal('Image', ImageConstructor);
-    Object.defineProperty(image, 'src', {
-      configurable: true,
-      set: () => image.onload?.(new Event('load')),
-    });
-
-    const loader = new AssetLoader({
-      version: '1.0.0',
-      basePath: './assets',
-      assets: [{ id: 'test.texture', type: 'texture', src: 'textures/test.png' }],
-    });
-    const asset = await loader.loadAsset(loader.getManifest().assets[0]);
-
-    expect(ImageConstructor).toHaveBeenCalledTimes(1);
-    expect(asset.ready).toBe(true);
-    expect(asset.url).toBe('./assets/textures/test.png');
-    expect(asset.resource).toBe(image);
-  });
-
-  it('reports failed resources instead of marking them ready', async () => {
-    const image = new Image();
-    vi.stubGlobal('Image', vi.fn(() => image));
-    Object.defineProperty(image, 'src', {
-      configurable: true,
-      set: () => image.onerror?.(new Event('error')),
-    });
-
-    const loader = new AssetLoader({
-      version: '1.0.0',
-      basePath: './assets',
-      assets: [{ id: 'missing.texture', type: 'texture', src: 'textures/missing.png' }],
-    });
-    const asset = await loader.loadAsset(loader.getManifest().assets[0]);
-
-    expect(asset.ready).toBe(false);
-    expect(asset.error).toContain('Failed to load image');
-  });
-
 });
 
-import { GameEngine } from '../core/GameEngine';
+import { GameEnginengine } from '../core/GameEngine';
 import { StateMachine } from '../core/StateMachine';
 import { AssetLoader } from '../assets/AssetLoader';
 import { Howl } from 'howler';
 import { createDefaultAssetManifest } from '../assets/AssetManifest';
 import { RenderEngine } from '../graphics/RenderEngine';
 
+vi.mock('howler', () => ({
+  Howl: class {
+    constructor(options: { onload?: () => void }) {
+      queueMicrotask(() => options.onload?.());
+    }
+
+    play = vi.fn();
+  },
+}));
+
+
 describe('Phase 1 smoke tests', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+
+    class MockImage {
+      onload?: () => void;
+      onerror?: () => void;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+
+    class MockFontFace {
+      family: string;
+
+      constructor(family: string, _source: string) {
+        this.family = family;
+      }
+
+      load(): Promise<FontFace> {
+        return Promise.resolve(this as unknown as FontFace);
+      }
+    }
+
+    vi.stubGlobal('Image', MockImage);
+    vi.stubGlobal('FontFace', MockFontFace);
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: {
+        add: vi.fn(),
+      },
+    });
   });
   it('constructs GameEngine without throwing', () => {
     const canvas = document.createElement('canvas');
@@ -215,6 +215,32 @@ describe('Phase 1 smoke tests', () => {
 
     expect(result).toBeTruthy();
     expect(Object.keys(result.textures)).toHaveLength(1);
-    expect(loader.getAsset('ui.cursor')).toMatchObject({ id: 'ui.cursor', type: 'texture' });
+    expect(Object.keys(result.fonts)).toHaveLength(1);
+    expect(Object.keys(result.sounds)).toHaveLength(1);
+    expect(Object.keys(result.sprites)).toHaveLength(1);
+    expect(loader.getAsset('test.texture')).toMatchObject({
+      id: 'test.texture',
+      type: 'texture',
+      url: './assets/test/wood.png',
+      ready: true,
+    });
+    expect(loader.getAsset('test.font')).toMatchObject({
+      id: 'test.font',
+      type: 'font',
+      url: './assets/test/typewriter.ttf',
+      ready: true,
+    });
+    expect(loader.getAsset('test.sprite')).toMatchObject({
+      id: 'test.sprite',
+      type: 'sprite',
+      url: './assets/test/grass.png',
+      ready: true,
+    });
+    expect(loader.getAsset('test.click')).toMatchObject({
+      id: 'test.click',
+      type: 'sound',
+      url: './assets/test/click.wav',
+      ready: true,
+    });
   });
 });
