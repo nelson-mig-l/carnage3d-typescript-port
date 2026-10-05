@@ -41,3 +41,24 @@
 | **2.9 Minimal rendered scene**       | Working browser scene                                    | ✅ Done                    |
 | **2.10 Relative asset path test**    | Covered by tests                                         | ✅ Done                    |
 | **2.10 Browser rendering**           | Confirmed working                                        | ✅ Done                    |
+
+### The biggest gaps
+
+There are five real pieces of Phase 2 work remaining:
+
+1. GTA1 camera
+  - Current `CameraRig` uses `BABYLON.FreeCamera`.
+  - Phase 2 calls for an isometric/orthographic-style camera direction.
+  - Zoom/position should become configurable.
+2. Real sprite renderer
+  - The current `test.sprite` gets turned into a `RawTexture`, but then is placed on a 3D box.
+  - That's a useful Phase 1 showcase, but it isn't a `Sprite2D` replacement yet.
+  - We need a plane/billboard sprite abstraction and eventually atlas regions.
+3. ShaderMaterial support
+  - No `ShaderMaterial` abstraction exists yet.
+4. HUD/GUI integration point
+  - No Babylon GUI or DOM/CSS HUD layer exists yet.
+5. Asset caching
+  - This one is subtle.
+  - `loadedAssets` stores results, but `loadAsset()` doesn't check the cache before loading.
+  - So it isn't yet true duplicate-load prevention.
