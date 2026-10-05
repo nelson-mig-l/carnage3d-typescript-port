@@ -56,7 +56,8 @@ export class GameEngine {
     }
 
     this.started = true;
-    await this.assetLoader.loadAll();
+    const assets = await this.assetLoader.loadAll();
+    this.renderEngine.showLoadedAssets(assets);
     this.inputManager.bindKeyboard();
     this.stateMachine.enter('mainMenu');
     this.gameLoop.start();
