@@ -33,12 +33,33 @@ vi.mock('babylonjs', () => {
 
   class MockGround {
     position = { y: 0 };
+    material: unknown;
+  }
+
+  class MockMesh {
+    position = {
+      x: 0,
+      y: 0,
+      z: 0,
+      set: vi.fn(),
+    };
+    material: unknown;
+    dispose = vi.fn();
+  }
+
+  class MockStandardMaterial {
+    diffuseTexture: unknown;
+    emissiveTexture: unknown;
+    specularColor: unknown;
+
+    constructor(_name: string, _scene: unknown) {}
   }
 
   class MockDynamicTexture {
     private context = {
       font: '',
       fillStyle: '',
+      clearRect: vi.fn(),
       fillText: vi.fn(),
     };
 
@@ -70,10 +91,21 @@ vi.mock('babylonjs', () => {
       constructor(public r: number, public g: number, public b: number, public a: number) {}
     },
     DynamicTexture: MockDynamicTexture,
+    StandardMaterial: MockStandardMaterial,
+    Color3: {
+      Black: vi.fn(() => ({ r: 0, g: 0, b: 0 })),
+    },
+    RawTexture: {
+      CreateRGBATexture: vi.fn(() => ({ dispose: vi.fn() })),
+    },
+    Texture: {
+      NEAREST_SAMPLINGMODE: 1,
+    },
     MeshBuilder: {
       CreateGround: vi.fn(() => new MockGround()),
-      CreateSphere: vi.fn(() => ({ position: { y: 0 } })),
-      CreateBox: vi.fn(() => ({ position: { x: 0, y: 0, z: 0 }, material: undefined, dispose: vi.fn() })),
+      CreateSphere: vi.fn(() => new MockMesh()),
+      CreateBox: vi.fn(() => new MockMesh()),
+      CreatePlane: vi.fn(() => new MockMesh()),
     },
   };
 
