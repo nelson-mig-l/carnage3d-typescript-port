@@ -35,6 +35,23 @@ vi.mock('babylonjs', () => {
     position = { y: 0 };
   }
 
+  class MockDynamicTexture {
+    private context = {
+      font: '',
+      fillStyle: '',
+      fillText: vi.fn(),
+    };
+
+    constructor(_name: string, _options: { width: number; height: number }) {}
+
+    getContext() {
+      return this.context;
+    }
+
+    update = vi.fn();
+    dispose = vi.fn();
+  }
+
   return {
     Engine: MockEngine,
     Scene: MockScene,
@@ -52,6 +69,7 @@ vi.mock('babylonjs', () => {
     Color4: class {
       constructor(public r: number, public g: number, public b: number, public a: number) {}
     },
+    DynamicTexture: MockDynamicTexture,
     MeshBuilder: {
       CreateGround: vi.fn(() => new MockGround()),
       CreateSphere: vi.fn(() => ({ position: { y: 0 } })),
