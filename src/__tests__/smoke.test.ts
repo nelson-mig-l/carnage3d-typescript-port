@@ -56,11 +56,54 @@ vi.mock('babylonjs', () => {
       CreateSphere: vi.fn(() => ({ position: { y: 0 } })),
     },
   };
+
+  it('loads an image resource from its manifest URL', async () => {
+    const image = new Image();
+    const ImageConstructor = vi.fn(() => image);
+    vi.stubGlobal('Image', ImageConstructor);
+    Object.defineProperty(image, 'src', {
+      configurable: true,
+      set: () => image.onload?.(new Event('load')),
+    });
+
+    const loader = new AssetLoader({
+      version: '1.0.0',
+      basePath: './assets',
+      assets: [{ id: 'test.texture', type: 'texture', src: 'textures/test.png' }],
+    });
+    const asset = await loader.loadAsset(loader.getManifest().assets[0]);
+
+    expect(ImageConstructor).toHaveBeenCalledTimes(1);
+    expect(asset.ready).toBe(true);
+    expect(asset.url).toBe('./assets/textures/test.png');
+    expect(asset.resource).toBe(image);
+  });
+
+  it('reports failed resources instead of marking them ready', async () => {
+    const image = new Image();
+    vi.stubGlobal('Image', vi.fn(() => image));
+    Object.defineProperty(image, 'src', {
+      configurable: true,
+      set: () => image.onerror?.(new Event('error')),
+    });
+
+    const loader = new AssetLoader({
+      version: '1.0.0',
+      basePath: './assets',
+      assets: [{ id: 'missing.texture', type: 'texture', src: 'textures/missing.png' }],
+    });
+    const asset = await loader.loadAsset(loader.getManifest().assets[0]);
+
+    expect(asset.ready).toBe(false);
+    expect(asset.error).toContain('Failed to load image');
+  });
+
 });
 
 import { GameEngine } from '../core/GameEngine';
 import { StateMachine } from '../core/StateMachine';
 import { AssetLoader } from '../assets/AssetLoader';
+import { Howl } from 'howler';
 import { createDefaultAssetManifest } from '../assets/AssetManifest';
 import { RenderEngine } from '../graphics/RenderEngine';
 
