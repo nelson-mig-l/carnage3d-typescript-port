@@ -59,7 +59,7 @@ vi.mock('babylonjs', () => {
 
 });
 
-import { GameEnginengine } from '../core/GameEngine';
+import { GameEngine } from '../core/GameEngine';
 import { StateMachine } from '../core/StateMachine';
 import { AssetLoader } from '../assets/AssetLoader';
 import { Howl } from 'howler';
