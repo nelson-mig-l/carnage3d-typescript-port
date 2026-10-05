@@ -29,7 +29,7 @@ export function createDefaultAssetManifest(): AssetManifest {
         id: 'test.font',
         type: 'font',
         src: 'test/typewriter.ttf',
-        metadata: { fallback: 'system-ui' },
+        metadata: { family: 'typewriter' },
       },
       {
         id: 'test.sprite',

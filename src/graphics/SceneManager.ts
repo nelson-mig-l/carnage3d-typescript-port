@@ -100,38 +100,53 @@ export class SceneManager {
   }
 
   private addFontShowcase(font: FontFace): void {
-    const plane = BABYLON.MeshBuilder.CreatePlane(
-      'test-font-sign',
-      { width: 7, height: 2 },
-      this.scene,
-    );
-    plane.position = new BABYLON.Vector3(0, 4, 1);
-    plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    if (!this.scene) {
+      return;
+    }
 
     const texture = new BABYLON.DynamicTexture(
-      'test-font-texture',
+      'font-showcase-texture',
       { width: 1024, height: 256 },
       this.scene,
-      true,
+      false,
     );
+
     const context = texture.getContext();
+
     context.clearRect(0, 0, 1024, 256);
-    context.fillStyle = '#111827';
-    context.fillRect(0, 0, 1024, 256);
-    context.fillStyle = '#f8fafc';
-    context.font = `64px "${font.family}"`;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText('Typewriter font loaded', 512, 128);
+
+    console.log(font);
+
+    context.font = `bold 24px ${font.family}`;
+    context.fillStyle = 'white';
+
+    context.fillText(
+      'Typewriter',
+      128,
+      128,
+    );
+
     texture.update();
 
-    const material = new BABYLON.StandardMaterial('test-font-material', this.scene);
-    material.diffuseTexture = texture;
-    material.emissiveColor = BABYLON.Color3.White();
-    material.specularColor = BABYLON.Color3.Black();
-    plane.material = material;
+    const material = new BABYLON.StandardMaterial(
+      'font-showcase-material',
+      this.scene,
+    );
 
-    this.generatedTextures.push(texture);
+    material.diffuseTexture = texture;
+    material.emissiveTexture = texture;
+
+    const plane = BABYLON.MeshBuilder.CreatePlane(
+      'font-showcase',
+      {
+        width: 16,
+        height: 4,
+      },
+      this.scene,
+    );
+
+    plane.position.set(0, 3, 0);
+    plane.material = material;
   }
 
   private disposeAssetShowcase(): void {
