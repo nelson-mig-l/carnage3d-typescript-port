@@ -6,8 +6,6 @@ Build the browser-based rendering foundation for the TypeScript port using Babyl
 
 Phase 2 should establish the renderer, basic scene and camera setup, minimal texture and mesh primitives, sprite support, and the first runtime asset-loading foundation. This is a targeted graphics milestone rather than a full conversion of all rendering subsystems.
 
-Before proceding to this phase make sure PHASE_1_TODO.md items are all marked as done.
-
 ---
 
 ## 2.1 Babylon.js Scene Setup
