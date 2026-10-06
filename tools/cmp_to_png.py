@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 """
-Render a top-down PNG preview of a GTA1/Carnage3D .CMP map.
+Render one transparent top-down PNG for each height level of a GTA1/Carnage3D .CMP map.
 
-For every 256x256 map cell the script decompresses the CMP column,
-selects the highest occupied block, and renders that block's lid/top
-texture from the corresponding G24 style file.
+Each PNG is 256x256 map cells at 64 pixels per cell (16384x16384).
+Pixels for cells without a block at that height remain fully transparent.
 
 The G24 decoder is reused from tools/g24_to_png.py.
 
 Usage:
     python tools/cmp_to_png.py public/assets/data/NYC.CMP
-    python tools/cmp_to_png.py public/assets/data/NYC.CMP -o nyc_top.png
-
-By default the style file is inferred from the CMP header:
-    STYLE###.G24
+    python tools/cmp_to_png.py public/assets/data/NYC.CMP -o nyc
+    python tools/cmp_to_png.py public/assets/data/NYC.CMP --output-dir maps
 """
 
 from __future__ import annotations
@@ -47,7 +44,7 @@ class MapBlock:
 
 
 def read_cmp(path: Path) -> tuple[int, list[int], list[int], list[MapBlock]]:
-    print(f"[1/4] Reading CMP: {path}", flush=True)
+    print(f"[1/3] Reading CMP: {path}", flush=True)
     data = path.read_bytes()
 
     if len(data) < CMP_HEADER_SIZE:
@@ -86,7 +83,6 @@ def read_cmp(path: Path) -> tuple[int, list[int], list[int], list[MapBlock]]:
 
     if column_size % 2:
         raise ValueError("CMP column_size is not divisible by 2")
-
     if offset + column_size > len(data):
         raise ValueError("CMP is truncated while reading column data")
 
@@ -97,7 +93,6 @@ def read_cmp(path: Path) -> tuple[int, list[int], list[int], list[MapBlock]]:
 
     if block_size % BLOCK_INFO_SIZE:
         raise ValueError("CMP block_size is not divisible by 8")
-
     if offset + block_size > len(data):
         raise ValueError("CMP is truncated while reading block data")
 
@@ -107,7 +102,6 @@ def read_cmp(path: Path) -> tuple[int, list[int], list[int], list[MapBlock]]:
         type_map, type_map_ext, _west, _east, _north, _south, lid = (
             struct.unpack_from("<H6B", data, block_offset)
         )
-
         blocks.append(
             MapBlock(
                 lid=lid,
@@ -127,17 +121,23 @@ def read_cmp(path: Path) -> tuple[int, list[int], list[int], list[MapBlock]]:
     return style_number, base_tiles, column_data, blocks
 
 
-def decompress_top_blocks(
+def decompress_map_layers(
     base_tiles: list[int],
     column_data: list[int],
     blocks: list[MapBlock],
-) -> list[MapBlock | None]:
-    """Select the highest occupied block in every map column."""
-    print("[2/4] Decompressing map columns...", flush=True)
+) -> list[list[MapBlock | None]]:
+    """
+    Reconstruct every map layer.
 
-    top_blocks: list[MapBlock | None] = [
-        None
-    ] * (MAP_DIMENSIONS * MAP_DIMENSIONS)
+    The result is [height][cell], where height 0 is the lowest map layer
+    and height 5 is the highest.
+    """
+    print("[2/3] Decompressing map layers...", flush=True)
+
+    layers: list[list[MapBlock | None]] = [
+        [None] * (MAP_DIMENSIONS * MAP_DIMENSIONS)
+        for _ in range(MAP_LAYERS_COUNT)
+    ]
 
     for y in range(MAP_DIMENSIONS):
         for x in range(MAP_DIMENSIONS):
@@ -161,30 +161,30 @@ def decompress_top_blocks(
 
             if height <= 0:
                 continue
-
             if height > MAP_LAYERS_COUNT:
                 raise ValueError(
                     f"Invalid column height at ({x}, {y}): {height}"
                 )
 
-            top_index = column_index + height
-            if top_index >= len(column_data):
-                raise ValueError(f"Column at ({x}, {y}) is truncated")
+            # The first entry gives the number of empty lower layers.
+            # Following entries are the occupied block indices from bottom
+            # to top, matching the original map decompression order.
+            for layer in range(height):
+                column_element = column_index + 1 + layer
+                if column_element >= len(column_data):
+                    raise ValueError(f"Column at ({x}, {y}) is truncated")
 
-            block_index = column_data[top_index]
-            if block_index >= len(blocks):
-                raise ValueError(
-                    f"Column at ({x}, {y}) references invalid block {block_index}"
-                )
+                block_index = column_data[column_element]
+                if block_index >= len(blocks):
+                    raise ValueError(
+                        f"Column at ({x}, {y}) references invalid block {block_index}"
+                    )
 
-            top_blocks[cell] = blocks[block_index]
+                layers[empty_layers + layer][cell] = blocks[block_index]
 
-        print(
-            f"      map row {y + 1:3d}/{MAP_DIMENSIONS}",
-            flush=True,
-        )
+        print(f"      map row {y + 1:3d}/{MAP_DIMENSIONS}", flush=True)
 
-    return top_blocks
+    return layers
 
 
 def transform_tile(
@@ -212,7 +212,6 @@ def transform_tile(
 
             if flip_left_right:
                 sx = TILE_SIZE - 1 - sx
-
             if flip_top_bottom:
                 sy = TILE_SIZE - 1 - sy
 
@@ -232,25 +231,18 @@ def png_chunk(chunk_type: bytes, payload: bytes) -> bytes:
     )
 
 
-def write_map_png(
+def write_layer_png(
     path: Path,
-    top_blocks: list[MapBlock | None],
+    layer: list[MapBlock | None],
     reader: G24Reader,
     remap: int,
-) -> None:
-    """
-    Write the 256x256 cell map at 64 pixels per cell.
-
-    Output dimensions are 16384x16384. PNG scanlines are streamed through
-    zlib instead of building the complete RGBA image in memory.
-    """
-    print("[3/4] Rendering PNG...", flush=True)
-
+    layer_number: int,
+) -> int:
+    """Write one transparent RGBA PNG for a single map layer."""
     width = MAP_DIMENSIONS * TILE_SIZE
     height = MAP_DIMENSIONS * TILE_SIZE
     compressor = zlib.compressobj(level=6)
-
-    path.parent.mkdir(parents=True, exist_ok=True)
+    populated = 0
 
     with path.open("wb") as output:
         output.write(b"\x89PNG\r\n\x1a\n")
@@ -265,12 +257,13 @@ def write_map_png(
             decoded_tiles: list[bytes | None] = []
 
             for map_x in range(MAP_DIMENSIONS):
-                block = top_blocks[map_y * MAP_DIMENSIONS + map_x]
+                block = layer[map_y * MAP_DIMENSIONS + map_x]
 
                 if block is None or block.lid >= reader.header.lid_count:
                     decoded_tiles.append(None)
                     continue
 
+                populated += 1
                 linear_lid_index = reader.linear_block_index("lid", block.lid)
                 tile = reader.decode_block(linear_lid_index, remap)
                 decoded_tiles.append(
@@ -283,6 +276,7 @@ def write_map_png(
                 )
 
             for texture_y in range(TILE_SIZE):
+                # Zero-filled RGBA rows are fully transparent for empty cells.
                 row = bytearray(width * 4)
 
                 for map_x, tile in enumerate(decoded_tiles):
@@ -300,7 +294,8 @@ def write_map_png(
                     output.write(png_chunk(b"IDAT", compressed))
 
             print(
-                f"      rendered row {map_y + 1:3d}/{MAP_DIMENSIONS}",
+                f"      layer {layer_number + 1}/{MAP_LAYERS_COUNT}, "
+                f"row {map_y + 1:3d}/{MAP_DIMENSIONS}",
                 flush=True,
             )
 
@@ -310,19 +305,29 @@ def write_map_png(
 
         output.write(png_chunk(b"IEND", b""))
 
-    print("[4/4] PNG complete.", flush=True)
+    return populated
 
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Render a top-down PNG preview from a GTA1/Carnage3D .CMP map."
+        description=(
+            "Render one transparent top-down PNG per height level "
+            "from a GTA1/Carnage3D .CMP map."
+        )
     )
     parser.add_argument("input", type=Path, help="Input .CMP file")
     parser.add_argument(
         "-o",
         "--output",
         type=Path,
-        help="Output PNG (default: <input>_top.png)",
+        help=(
+            "Output prefix or .png path. Default: <input>_layer_N.png"
+        ),
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="Directory for layer PNGs (default: alongside the input)",
     )
     parser.add_argument(
         "--style",
@@ -339,12 +344,36 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def layer_output_path(
+    input_path: Path,
+    output: Path | None,
+    output_dir: Path | None,
+    layer_number: int,
+) -> Path:
+    if output_dir is not None:
+        return output_dir / f"{input_path.stem}_layer_{layer_number + 1}.png"
+
+    if output is None:
+        return input_path.with_name(
+            f"{input_path.stem}_layer_{layer_number + 1}.png"
+        )
+
+    if output.suffix.lower() == ".png":
+        return output.with_name(
+            f"{output.stem}_layer_{layer_number + 1}.png"
+        )
+
+    return output.parent / f"{output.name}_layer_{layer_number + 1}.png"
+
+
 def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
 
     if not args.input.is_file():
         parser.error(f"Input file does not exist: {args.input}")
+    if args.output is not None and args.output_dir is not None:
+        parser.error("--output and --output-dir cannot be used together")
 
     try:
         style_number, base_tiles, column_data, blocks = read_cmp(args.input)
@@ -361,29 +390,55 @@ def main() -> int:
                 "Use --style to specify the corresponding G24 file."
             )
 
-        output = args.output or args.input.with_name(
-            f"{args.input.stem}_top.png"
-        )
-
-        print(f"[3/4] Loading style: {style_path}", flush=True)
+        print(f"[3/3] Loading style: {style_path}", flush=True)
         reader = G24Reader(style_path)
 
-        top_blocks = decompress_top_blocks(
+        layers = decompress_map_layers(
             base_tiles,
             column_data,
             blocks,
         )
 
-        write_map_png(output, top_blocks, reader, args.remap)
+        total_populated = 0
 
-        populated = sum(block is not None for block in top_blocks)
+        for layer_number, layer in enumerate(layers):
+            output_path = layer_output_path(
+                args.input,
+                args.output,
+                args.output_dir,
+                layer_number,
+            )
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        print(f"Created: {output}")
-        print(f"Size:    {MAP_DIMENSIONS * TILE_SIZE} x {MAP_DIMENSIONS * TILE_SIZE}")
-        print(f"Cells:   {MAP_DIMENSIONS} x {MAP_DIMENSIONS}")
-        print(f"Filled:  {populated}")
+            print(
+                f"Rendering layer {layer_number + 1}/{MAP_LAYERS_COUNT}: "
+                f"{output_path}",
+                flush=True,
+            )
+
+            populated = write_layer_png(
+                output_path,
+                layer,
+                reader,
+                args.remap,
+                layer_number,
+            )
+            total_populated += populated
+
+            print(
+                f"      complete: {populated:,} populated cells",
+                flush=True,
+            )
+
+        print("Done.")
+        print(f"Created: {MAP_LAYERS_COUNT} layer PNGs")
+        print(
+            f"Size:    {MAP_DIMENSIONS * TILE_SIZE} x "
+            f"{MAP_DIMENSIONS * TILE_SIZE}"
+        )
         print(f"Style:   {style_path}")
         print(f"Remap:   {args.remap}")
+        print(f"Cells:   {total_populated:,} block placements across all layers")
 
         return 0
 
