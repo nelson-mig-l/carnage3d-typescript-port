@@ -13,7 +13,7 @@ Usage:
     python tools/cmp_to_png.py public/assets/data/NYC.CMP -o nyc_top.png
 
 By default the style file is inferred from the CMP header:
-    STYLE%03d.G24
+    STYLE###.G24
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ TILE_SIZE = 64
 
 CMP_HEADER_FORMAT = "<7I"
 CMP_HEADER_SIZE = struct.calcsize(CMP_HEADER_FORMAT)
-BLOCK_INFO_SIZE = 8  # uint16 type_map + six uint8 values
+BLOCK_INFO_SIZE = 8
 
 
 @dataclass(frozen=True)
@@ -46,9 +46,8 @@ class MapBlock:
     flip_left_right: bool
 
 
-def read_cmp(
-    path: Path,
-) -> tuple[int, list[int], list[int], list[MapBlock]]:
+def read_cmp(path: Path) -> tuple[int, list[int], list[int], list[MapBlock]]:
+    print(f"[1/4] Reading CMP: {path}", flush=True)
     data = path.read_bytes()
 
     if len(data) < CMP_HEADER_SIZE:
@@ -69,7 +68,6 @@ def read_cmp(
             f"Unsupported CMP version {version}; Carnage3D expects {CMP_VERSION}"
         )
 
-    # GTA1 stores the style number in the first byte of the union.
     style_number = numbers & 0xFF
     offset = CMP_HEADER_SIZE
 
@@ -93,11 +91,7 @@ def read_cmp(
         raise ValueError("CMP is truncated while reading column data")
 
     column_data = list(
-        struct.unpack_from(
-            f"<{column_size // 2}H",
-            data,
-            offset,
-        )
+        struct.unpack_from(f"<{column_size // 2}H", data, offset)
     )
     offset += column_size
 
@@ -123,9 +117,13 @@ def read_cmp(
             )
         )
 
-    # The remaining CMP sections are not needed for this static preview.
     _ = route_size, object_pos_size, nav_data_size
 
+    print(
+        f"      version={version}, style={style_number:03d}, "
+        f"blocks={len(blocks):,}, columns={len(column_data):,}",
+        flush=True,
+    )
     return style_number, base_tiles, column_data, blocks
 
 
@@ -134,10 +132,8 @@ def decompress_top_blocks(
     column_data: list[int],
     blocks: list[MapBlock],
 ) -> list[MapBlock | None]:
-    """
-    Reproduce GameMapManager::ReadCompressedMapData() and select the
-    highest occupied block in every map column.
-    """
+    """Select the highest occupied block in every map column."""
+    print("[2/4] Decompressing map columns...", flush=True)
 
     top_blocks: list[MapBlock | None] = [
         None
@@ -171,17 +167,9 @@ def decompress_top_blocks(
                     f"Invalid column height at ({x}, {y}): {height}"
                 )
 
-            # In the original decompression loop:
-            #
-            #   srcBlock = columnData[columnElement + columnHeight - tilez]
-            #
-            # with tilez=0 being the highest map layer. Therefore this is
-            # the topmost occupied block.
             top_index = column_index + height
             if top_index >= len(column_data):
-                raise ValueError(
-                    f"Column at ({x}, {y}) is truncated"
-                )
+                raise ValueError(f"Column at ({x}, {y}) is truncated")
 
             block_index = column_data[top_index]
             if block_index >= len(blocks):
@@ -190,6 +178,11 @@ def decompress_top_blocks(
                 )
 
             top_blocks[cell] = blocks[block_index]
+
+        print(
+            f"      map row {y + 1:3d}/{MAP_DIMENSIONS}",
+            flush=True,
+        )
 
     return top_blocks
 
@@ -201,7 +194,6 @@ def transform_tile(
     flip_left_right: bool,
 ) -> bytes:
     """Apply the CMP lid rotation and flip flags to one 64x64 RGBA tile."""
-
     if len(tile) != TILE_SIZE * TILE_SIZE * 4:
         raise ValueError("Expected a 64x64 RGBA tile")
 
@@ -211,11 +203,11 @@ def transform_tile(
         for x in range(TILE_SIZE):
             sx, sy = x, y
 
-            if rotation == 1:       # 90 degrees clockwise
+            if rotation == 1:
                 sx, sy = y, TILE_SIZE - 1 - x
-            elif rotation == 2:     # 180 degrees
+            elif rotation == 2:
                 sx, sy = TILE_SIZE - 1 - x, TILE_SIZE - 1 - y
-            elif rotation == 3:     # 270 degrees clockwise
+            elif rotation == 3:
                 sx, sy = TILE_SIZE - 1 - y, x
 
             if flip_left_right:
@@ -249,10 +241,10 @@ def write_map_png(
     """
     Write the 256x256 cell map at 64 pixels per cell.
 
-    Output dimensions are therefore 16384x16384. PNG scanlines are
-    streamed through zlib instead of building the complete RGBA image
-    in memory.
+    Output dimensions are 16384x16384. PNG scanlines are streamed through
+    zlib instead of building the complete RGBA image in memory.
     """
+    print("[3/4] Rendering PNG...", flush=True)
 
     width = MAP_DIMENSIONS * TILE_SIZE
     height = MAP_DIMENSIONS * TILE_SIZE
@@ -275,25 +267,20 @@ def write_map_png(
             for map_x in range(MAP_DIMENSIONS):
                 block = top_blocks[map_y * MAP_DIMENSIONS + map_x]
 
-                if block is None:
-                    decoded_tiles.append(None)
-                    continue
-
-                if block.lid >= reader.header.lid_count:
+                if block is None or block.lid >= reader.header.lid_count:
                     decoded_tiles.append(None)
                     continue
 
                 linear_lid_index = reader.linear_block_index("lid", block.lid)
                 tile = reader.decode_block(linear_lid_index, remap)
-
-                tile = transform_tile(
-                    tile,
-                    block.lid_rotation,
-                    block.flip_top_bottom,
-                    block.flip_left_right,
+                decoded_tiles.append(
+                    transform_tile(
+                        tile,
+                        block.lid_rotation,
+                        block.flip_top_bottom,
+                        block.flip_left_right,
+                    )
                 )
-
-                decoded_tiles.append(tile)
 
             for texture_y in range(TILE_SIZE):
                 row = bytearray(width * 4)
@@ -308,10 +295,14 @@ def write_map_png(
                         src:src + TILE_SIZE * 4
                     ]
 
-                scanline = b"\x00" + bytes(row)
-                compressed = compressor.compress(scanline)
+                compressed = compressor.compress(b"\x00" + bytes(row))
                 if compressed:
                     output.write(png_chunk(b"IDAT", compressed))
+
+            print(
+                f"      rendered row {map_y + 1:3d}/{MAP_DIMENSIONS}",
+                flush=True,
+            )
 
         compressed = compressor.flush()
         if compressed:
@@ -319,18 +310,14 @@ def write_map_png(
 
         output.write(png_chunk(b"IEND", b""))
 
+    print("[4/4] PNG complete.", flush=True)
+
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=(
-            "Render a top-down PNG preview from a GTA1/Carnage3D .CMP map."
-        )
+        description="Render a top-down PNG preview from a GTA1/Carnage3D .CMP map."
     )
-    parser.add_argument(
-        "input",
-        type=Path,
-        help="Input .CMP file",
-    )
+    parser.add_argument("input", type=Path, help="Input .CMP file")
     parser.add_argument(
         "-o",
         "--output",
@@ -340,10 +327,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--style",
         type=Path,
-        help=(
-            "G24 style file; defaults to STYLE%03d.G24 "
-            "beside the CMP file"
-        ),
+        help="G24 style file; defaults to STYLE###.G24 beside the CMP file",
     )
     parser.add_argument(
         "--remap",
@@ -381,19 +365,16 @@ def main() -> int:
             f"{args.input.stem}_top.png"
         )
 
+        print(f"[3/4] Loading style: {style_path}", flush=True)
         reader = G24Reader(style_path)
+
         top_blocks = decompress_top_blocks(
             base_tiles,
             column_data,
             blocks,
         )
 
-        write_map_png(
-            output,
-            top_blocks,
-            reader,
-            args.remap,
-        )
+        write_map_png(output, top_blocks, reader, args.remap)
 
         populated = sum(block is not None for block in top_blocks)
 
