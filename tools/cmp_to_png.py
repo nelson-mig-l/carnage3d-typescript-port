@@ -5,6 +5,9 @@ Render one transparent top-down PNG for each height level of a GTA1/Carnage3D .C
 Each PNG is 256x256 map cells at 64 pixels per cell (16384x16384).
 Pixels for cells without a block at that height remain fully transparent.
 
+A matching .txt file is written for every layer with the number of map
+cells using each G24 lid texture.
+
 The G24 decoder is reused from tools/g24_to_png.py.
 
 Usage:
@@ -19,6 +22,7 @@ import argparse
 import struct
 import sys
 import zlib
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -166,9 +170,6 @@ def decompress_map_layers(
                     f"Invalid column height at ({x}, {y}): {height}"
                 )
 
-            # The first entry gives the number of empty lower layers.
-            # Following entries are the occupied block indices from bottom
-            # to top, matching the original map decompression order.
             for layer in range(height):
                 column_element = column_index + 1 + layer
                 if column_element >= len(column_data):
@@ -237,12 +238,12 @@ def write_layer_png(
     reader: G24Reader,
     remap: int,
     layer_number: int,
-) -> int:
-    """Write one transparent RGBA PNG for a single map layer."""
+) -> tuple[int, Counter[int]]:
+    """Write one transparent RGBA PNG and count cells by G24 lid texture."""
     width = MAP_DIMENSIONS * TILE_SIZE
     height = MAP_DIMENSIONS * TILE_SIZE
     compressor = zlib.compressobj(level=6)
-    populated = 0
+    texture_counts: Counter[int] = Counter()
 
     with path.open("wb") as output:
         output.write(b"\x89PNG\r\n\x1a\n")
@@ -263,7 +264,7 @@ def write_layer_png(
                     decoded_tiles.append(None)
                     continue
 
-                populated += 1
+                texture_counts[block.lid] += 1
                 linear_lid_index = reader.linear_block_index("lid", block.lid)
                 tile = reader.decode_block(linear_lid_index, remap)
                 decoded_tiles.append(
@@ -276,7 +277,6 @@ def write_layer_png(
                 )
 
             for texture_y in range(TILE_SIZE):
-                # Zero-filled RGBA rows are fully transparent for empty cells.
                 row = bytearray(width * 4)
 
                 for map_x, tile in enumerate(decoded_tiles):
@@ -305,7 +305,30 @@ def write_layer_png(
 
         output.write(png_chunk(b"IEND", b""))
 
-    return populated
+    return sum(texture_counts.values()), texture_counts
+
+
+def write_texture_report(
+    path: Path,
+    layer_number: int,
+    texture_counts: Counter[int],
+) -> None:
+    """Write one text report listing every texture used by this layer."""
+    total = sum(texture_counts.values())
+
+    with path.open("w", encoding="utf-8") as report:
+        report.write(f"Layer {layer_number + 1}\n")
+        report.write(f"Total populated cells: {total:,}\n")
+        report.write(f"Unique textures: {len(texture_counts):,}\n")
+        report.write("\n")
+        report.write("Texture ID\tTile count\n")
+        report.write("----------\t----------\n")
+
+        for texture_id, count in sorted(
+            texture_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        ):
+            report.write(f"{texture_id}\t{count:,}\n")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -320,14 +343,12 @@ def create_parser() -> argparse.ArgumentParser:
         "-o",
         "--output",
         type=Path,
-        help=(
-            "Output prefix or .png path. Default: <input>_layer_N.png"
-        ),
+        help="Output prefix or .png path. Default: <input>_layer_N.png",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        help="Directory for layer PNGs (default: alongside the input)",
+        help="Directory for layer PNGs and TXT reports (default: alongside the input)",
     )
     parser.add_argument(
         "--style",
@@ -410,28 +431,39 @@ def main() -> int:
             )
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
+            report_path = output_path.with_suffix(".txt")
+
             print(
                 f"Rendering layer {layer_number + 1}/{MAP_LAYERS_COUNT}: "
                 f"{output_path}",
                 flush=True,
             )
 
-            populated = write_layer_png(
+            populated, texture_counts = write_layer_png(
                 output_path,
                 layer,
                 reader,
                 args.remap,
                 layer_number,
             )
+
+            write_texture_report(
+                report_path,
+                layer_number,
+                texture_counts,
+            )
+
             total_populated += populated
 
             print(
-                f"      complete: {populated:,} populated cells",
+                f"      complete: {populated:,} populated cells, "
+                f"{len(texture_counts):,} unique textures",
                 flush=True,
             )
+            print(f"      report:   {report_path}", flush=True)
 
         print("Done.")
-        print(f"Created: {MAP_LAYERS_COUNT} layer PNGs")
+        print(f"Created: {MAP_LAYERS_COUNT} layer PNGs + {MAP_LAYERS_COUNT} TXT reports")
         print(
             f"Size:    {MAP_DIMENSIONS * TILE_SIZE} x "
             f"{MAP_DIMENSIONS * TILE_SIZE}"
