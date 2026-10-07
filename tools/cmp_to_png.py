@@ -238,6 +238,7 @@ def write_layer_png(
     reader: G24Reader,
     remap: int,
     layer_number: int,
+    skip_textures: set[int],
 ) -> tuple[int, Counter[int]]:
     """Write one transparent RGBA PNG and count cells by G24 lid texture."""
     width = MAP_DIMENSIONS * TILE_SIZE
@@ -260,7 +261,11 @@ def write_layer_png(
             for map_x in range(MAP_DIMENSIONS):
                 block = layer[map_y * MAP_DIMENSIONS + map_x]
 
-                if block is None or block.lid >= reader.header.lid_count:
+                if (
+                    block is None
+                    or block.lid >= reader.header.lid_count
+                    or block.lid in skip_textures
+                ):
                     decoded_tiles.append(None)
                     continue
 
@@ -362,6 +367,17 @@ def create_parser() -> argparse.ArgumentParser:
         default=0,
         help="Palette/remap index (default: 0)",
     )
+    parser.add_argument(
+        "--skip-texture",
+        type=int,
+        action="append",
+        default=[],
+        metavar="ID",
+        help=(
+            "Make this G24 lid texture transparent. Repeat the option to "
+            "skip multiple texture IDs."
+        ),
+    )
     return parser
 
 
@@ -420,6 +436,14 @@ def main() -> int:
             blocks,
         )
 
+        skip_textures = set(args.skip_texture)
+        if skip_textures:
+            print(
+                "Skipping textures: "
+                + ", ".join(str(texture_id) for texture_id in sorted(skip_textures)),
+                flush=True,
+            )
+
         total_populated = 0
 
         for layer_number, layer in enumerate(layers):
@@ -445,6 +469,7 @@ def main() -> int:
                 reader,
                 args.remap,
                 layer_number,
+                skip_textures,
             )
 
             write_texture_report(
@@ -470,6 +495,11 @@ def main() -> int:
         )
         print(f"Style:   {style_path}")
         print(f"Remap:   {args.remap}")
+        print(
+            "Skipped: "
+            + (", ".join(str(texture_id) for texture_id in sorted(skip_textures))
+               if skip_textures else "none")
+        )
         print(f"Cells:   {total_populated:,} block placements across all layers")
 
         return 0
