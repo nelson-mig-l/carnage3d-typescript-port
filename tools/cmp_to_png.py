@@ -313,6 +313,137 @@ def write_layer_png(
     return sum(texture_counts.values()), texture_counts
 
 
+def write_composite_png(
+    path: Path,
+    layers: list[list[MapBlock | None]],
+    reader: G24Reader,
+    remap: int,
+    skip_textures: set[int],
+) -> None:
+    """Write one composite PNG with layer 6 at the bottom and layer 1 on top."""
+    width = MAP_DIMENSIONS * TILE_SIZE
+    height = MAP_DIMENSIONS * TILE_SIZE
+    compressor = zlib.compressobj(level=6)
+
+    # Layer 6 is the bottom layer, so render from 6 down to 1.
+    render_order = range(MAP_LAYERS_COUNT - 1, -1, -1)
+
+    with path.open("wb") as output:
+        output.write(b"\x89PNG\r\n\x1a\n")
+        output.write(
+            png_chunk(
+                b"IHDR",
+                struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0),
+            )
+        )
+
+        for map_y in range(MAP_DIMENSIONS):
+            layer_tiles: dict[int, list[bytes | None]] = {}
+
+            for layer_number in render_order:
+                decoded_tiles: list[bytes | None] = []
+                layer = layers[layer_number]
+
+                for map_x in range(MAP_DIMENSIONS):
+                    block = layer[map_y * MAP_DIMENSIONS + map_x]
+
+                    if (
+                        block is None
+                        or block.lid >= reader.header.lid_count
+                        or block.lid in skip_textures
+                    ):
+                        decoded_tiles.append(None)
+                        continue
+
+                    linear_lid_index = reader.linear_block_index("lid", block.lid)
+                    tile = reader.decode_block(linear_lid_index, remap)
+                    decoded_tiles.append(
+                        transform_tile(
+                            tile,
+                            block.lid_rotation,
+                            block.flip_top_bottom,
+                            block.flip_left_right,
+                        )
+                    )
+
+                layer_tiles[layer_number] = decoded_tiles
+
+            for texture_y in range(TILE_SIZE):
+                row = bytearray(width * 4)
+
+                for layer_number in render_order:
+                    tiles = layer_tiles[layer_number]
+
+                    for map_x, tile in enumerate(tiles):
+                        if tile is None:
+                            continue
+
+                        src = texture_y * TILE_SIZE * 4
+                        dst = map_x * TILE_SIZE * 4
+
+                        for pixel in range(TILE_SIZE):
+                            source_index = src + pixel * 4
+                            destination_index = dst + pixel * 4
+                            source_alpha = tile[source_index + 3]
+
+                            if source_alpha == 0:
+                                continue
+
+                            if source_alpha == 255:
+                                row[destination_index:destination_index + 4] = tile[
+                                    source_index:source_index + 4
+                                ]
+                                continue
+
+                            destination_alpha = row[destination_index + 3]
+                            source_alpha_normalized = source_alpha / 255.0
+                            destination_alpha_normalized = destination_alpha / 255.0
+                            output_alpha = (
+                                source_alpha_normalized
+                                + destination_alpha_normalized
+                                * (1.0 - source_alpha_normalized)
+                            )
+
+                            if output_alpha == 0:
+                                continue
+
+                            for channel in range(3):
+                                source_channel = tile[source_index + channel] / 255.0
+                                destination_channel = (
+                                    row[destination_index + channel] / 255.0
+                                )
+                                output_channel = (
+                                    source_channel * source_alpha_normalized
+                                    + destination_channel
+                                    * destination_alpha_normalized
+                                    * (1.0 - source_alpha_normalized)
+                                ) / output_alpha
+                                row[destination_index + channel] = max(
+                                    0,
+                                    min(255, round(output_channel * 255.0)),
+                                )
+
+                            row[destination_index + 3] = max(
+                                0,
+                                min(255, round(output_alpha * 255.0)),
+                            )
+
+                compressed = compressor.compress(b"\x00" + bytes(row))
+                if compressed:
+                    output.write(png_chunk(b"IDAT", compressed))
+
+            print(
+                f"      composite row {map_y + 1:3d}/{MAP_DIMENSIONS}",
+                flush=True,
+            )
+
+        compressed = compressor.flush()
+        if compressed:
+            output.write(png_chunk(b"IDAT", compressed))
+
+        output.write(png_chunk(b"IEND", b""))
+
+
 def write_texture_report(
     path: Path,
     layer_number: int,
@@ -366,6 +497,14 @@ def create_parser() -> argparse.ArgumentParser:
         choices=(0, 1, 2, 3),
         default=0,
         help="Palette/remap index (default: 0)",
+    )
+    parser.add_argument(
+        "--composite",
+        action="store_true",
+        help=(
+            "Also write one composite PNG with layer 6 at the bottom and "
+            "layer 1 at the top."
+        ),
     )
     parser.add_argument(
         "--skip-texture",
@@ -487,6 +626,36 @@ def main() -> int:
             )
             print(f"      report:   {report_path}", flush=True)
 
+        if args.composite:
+            if args.output_dir is not None:
+                composite_path = args.output_dir / f"{args.input.stem}_composite.png"
+            elif args.output is None:
+                composite_path = args.input.with_name(
+                    f"{args.input.stem}_composite.png"
+                )
+            elif args.output.suffix.lower() == ".png":
+                composite_path = args.output.with_name(
+                    f"{args.output.stem}_composite.png"
+                )
+            else:
+                composite_path = args.output.parent / f"{args.output.name}_composite.png"
+
+            composite_path.parent.mkdir(parents=True, exist_ok=True)
+
+            print(
+                "Rendering composite (layer 6 bottom -> layer 1 top): "
+                f"{composite_path}",
+                flush=True,
+            )
+            write_composite_png(
+                composite_path,
+                layers,
+                reader,
+                args.remap,
+                skip_textures,
+            )
+            print(f"      composite complete: {composite_path}", flush=True)
+
         print("Done.")
         print(f"Created: {MAP_LAYERS_COUNT} layer PNGs + {MAP_LAYERS_COUNT} TXT reports")
         print(
@@ -501,6 +670,7 @@ def main() -> int:
                if skip_textures else "none")
         )
         print(f"Cells:   {total_populated:,} block placements across all layers")
+        print(f"Composite: {'yes' if args.composite else 'no'}")
 
         return 0
 
