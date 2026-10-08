@@ -13,6 +13,7 @@ The tool:
 - Makes cells without a block transparent.
 - Writes a texture-usage report for every layer.
 - Can make selected texture IDs transparent with `--skip-texture`.
+- Can generate one combined composite map with `--composite`.
 - Reuses the G24 decoder from `tools/g24_to_png.py`.
 
 ---
@@ -104,7 +105,7 @@ _layer_2.png
 _layer_6.png
 ```
 
-Layer 1 is the lowest level and layer 6 is the highest.
+**Important:** layer 6 is the bottom layer and layer 1 is the top layer. When layers are composited, they are drawn in the order **6 → 5 → 4 → 3 → 2 → 1**, so layer 1 appears above all lower layers.
 
 Every output image represents 256 × 256 map cells. Each cell is rendered as a 64 × 64 pixel tile, making every output image 16384 × 16384 pixels.
 
@@ -229,6 +230,70 @@ python tools/cmp_to_png.py \
 
 ---
 
+# `--composite`
+
+Generate one additional combined map image containing all six height layers.
+
+```bash
+python tools/cmp_to_png.py \
+    public/assets/data/NYC.CMP \
+    --composite
+```
+
+The output is `NYC_composite.png`.
+
+The composite uses this draw order:
+
+```text
+TOP
+Layer 1
+Layer 2
+Layer 3
+Layer 4
+Layer 5
+Layer 6
+BOTTOM
+```
+
+In other words, the renderer draws **layer 6 → 5 → 4 → 3 → 2 → 1**. Layer 6 forms the background, while layer 1 is rendered last and appears above all lower layers.
+
+The composite preserves RGBA transparency and alpha-composites partially transparent pixels. Cells with no block, invalid lid textures, or textures selected by `--skip-texture` remain transparent.
+
+The composite is generated directly from the decoded CMP layers; it does not read the individual layer PNGs back from disk.
+
+### Output naming
+
+With `--composite`, the default output is:
+
+```text
+NYC_layer_1.png
+...
+NYC_layer_6.png
+NYC_composite.png
+```
+
+With `--output-dir`:
+
+```bash
+python tools/cmp_to_png.py NYC.CMP \
+    --output-dir maps/NYC \
+    --composite
+```
+
+the composite is `maps/NYC/NYC_composite.png`.
+
+With `-o`:
+
+```bash
+python tools/cmp_to_png.py NYC.CMP -o nyc --composite
+```
+
+the composite is `nyc_composite.png`.
+
+The composite uses the same `--style`, `--remap`, and `--skip-texture` settings as the individual layer outputs.
+
+---
+
 # `--skip-texture`
 
 Make one or more G24 texture IDs transparent.
@@ -343,10 +408,11 @@ tools/cmp_to_png.py
    ├── NYC_layer_5.png
    ├── NYC_layer_5.txt
    ├── NYC_layer_6.png
-   └── NYC_layer_6.txt
+   ├── NYC_layer_6.txt
+   └── NYC_composite.png
 ```
 
-The PNGs provide the visual map representation while the text files identify which textures dominate each layer.
+The individual PNGs provide the visual representation of each height. The composite provides the complete stacked view. The text files identify which textures dominate each layer.
 
 ---
 
@@ -440,7 +506,6 @@ See `tools/g24_to_png.md` for details about the G24 texture format and palette h
 
 Potential additions include:
 
-- Combined composite map output.
 - Side-texture rendering.
 - Map coordinates in texture reports.
 - JSON metadata for browser loading.
