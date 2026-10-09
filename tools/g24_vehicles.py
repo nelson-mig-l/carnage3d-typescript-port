@@ -35,8 +35,8 @@ VEHICLE_TYPES = {
     14: "tank",
 }
 # Carnage3D constants used by ReadVehicles.
-MAX_CAR_REMAPS = 4
-MAX_CAR_DOORS = 8
+MAX_CAR_REMAPS = 12
+MAX_CAR_DOORS = 4
 REMAP_8BIT_BYTES = MAX_CAR_REMAPS
 FIXED_FIELDS = (
     "mass", "thrust", "tyre_adhesion_x", "tyre_adhesion_y",
@@ -90,17 +90,17 @@ def parse_vehicles(data: bytes, offset: int, length: int) -> list[dict]:
         c.unpack(f"<{REMAP_8BIT_BYTES}B", "8-bit remaps")
 
         type_code = c.unpack("<B", "vehicle type")
-        model_id = c.unpack("<b", "model id")
-        turning = c.unpack("<b", "turning")
-        damageable = c.unpack("<b", "damageable")
-        values = list(c.unpack("<4i", "vehicle values"))
+        model_id = c.unpack("<B", "model id")
+        turning = c.unpack("<B", "turning")
+        damageable = c.unpack("<B", "damageable")
+        values = list(c.unpack("<4h", "vehicle values"))
         cx, cy = c.unpack("<2b", "centre of mass")
         moment = c.unpack("<i", "moment of inertia")
         fixed = list(c.unpack("<7i", "physics fixed-point values"))
         turn_ratio, drive_wheel_offset, steering_wheel_offset = c.unpack("<3h", "wheel/turn settings")
         trailing_fixed = list(c.unpack("<2i", "slide fixed-point values"))
         flags = c.unpack("<B", "vehicle flags")
-        engine, radio, horn, sound_function, fast_change = c.unpack("<5b", "vehicle audio/settings")
+        engine, radio, horn, sound_function, fast_change = c.unpack("<5B", "vehicle audio/settings")
         door_count = c.unpack("<h", "door count")
         if door_count < 0 or door_count > MAX_CAR_DOORS:
             raise ValueError(f"Vehicle {len(vehicles)} has invalid door count {door_count}")
