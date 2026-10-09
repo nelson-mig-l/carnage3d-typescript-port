@@ -86,7 +86,7 @@ def parse_entries(data: bytes) -> list[tuple[str, str]]:
 
         key_bytes = data[pos + 1:key_end]
         value_start = key_end + 1
-        value_end = data.find(b"\\0", value_start)
+        value_end = data.find(b"\0", value_start)
         if value_end < 0:
             # Be tolerant of files whose final value has no NUL terminator.
             value_end = len(data)
